@@ -316,8 +316,8 @@ class Llama(LlamaPreTrainedModel):
 
 def load_pretrained(checkpoint):
   device = 'cuda' if torch.cuda.is_available() else 'cpu' # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1', etc.
-  #dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16' # 'float32' or 'bfloat16' or 'float16'
-  dtype = "float32"
+  dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float32' # 'float32' or 'bfloat16' or 'float16'
+  #dtype = "float32"
 
   torch.backends.cuda.matmul.allow_tf32 = True # allow tf32 on matmul
   torch.backends.cudnn.allow_tf32 = True # allow tf32 on cudnn
