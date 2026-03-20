@@ -19,3 +19,5 @@ pip install tokenizers==0.13.3
 pip install sentencepiece==0.1.99
 pip install matplotlib==3.10.8
 wget https://www.cs.cmu.edu/~vijayv/stories42M.pt
+
+# pip install tqdm requests importlib-metadata filelock scikit-learn numpy tokenizers sentencepiece matplotlib
