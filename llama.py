@@ -4,6 +4,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from einops import rearrange
 
 from base_llama import LlamaPreTrainedModel, LlamaConfig
 from rope import apply_rotary_emb
@@ -107,8 +108,24 @@ class Attention(nn.Module):
         An optimal implementation will compute attention for all heads
         jointly using matrix/tensor operations.
         '''
-        # todo
-        raise NotImplementedError
+        '''query = self.compute_query(query)
+        key = self.compute_key(key)
+        value = self.compute_value(value)'''
+        # query, key, value are expected to have shape (bs, n_local_heads, seqlen, head_dim)
+        # Compute scaled dot-product attention logits
+        pre_softmax = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(self.head_dim)
+
+        # Apply causal mask before softmax, using large negative values for masked positions.
+        # Slice the mask to the actual sequence length to avoid shape mismatches.
+        if self.causal and hasattr(self, "causal_mask"):
+            seq_len = query.size(-2)
+            causal_mask = self.causal_mask[:seq_len, :seq_len]
+            pre_softmax = pre_softmax.masked_fill(causal_mask == 0, -1e9)
+        post_softmax = torch.softmax(pre_softmax, dim=-1)
+        scores = torch.matmul(post_softmax, value)
+        scores = rearrange(scores, "bs n_heads seq_len head_dim -> bs seq_len (n_heads head_dim)")
+        return scores
+
 
 
     def forward(
@@ -212,8 +229,14 @@ class LlamaLayer(nn.Module):
         5) add a residual connection from the unnormalized self-attention output to the
            output of the feed-forward network
         '''
-        # todo
-        raise NotImplementedError
+        residual = x
+        x = self.attention_norm(x)
+        x = self.attention(x)
+        out = self.ffn_norm(x + residual)
+        out = self.feed_forward(out)
+        return out + x
+
+
 
 class Llama(LlamaPreTrainedModel):
     def __init__(self, config: LlamaConfig):
@@ -303,11 +326,17 @@ class Llama(LlamaPreTrainedModel):
                 6) Renormalize the remaining probabilities so they sum to 1.
                 7) Sample from this filtered probability distribution.
                 '''
-                # todo 
+                prob = torch.softmax(logits/temperature, dim=-1)
+                prob, index = torch.sort(prob, dim=-1, descending=True)
+                prob = torch.cumsum(prob, dim=-1)
+                mask = prob <= top_p
+                prob = prob * mask.float()
+                prob = prob / prob.sum(dim=-1, keepdim=True)
+                sample = torch.multinomial(prob, num_samples=1)
 
-                raise NotImplementedError
+
                 # map to original vocab indices
-                idx_next = None
+                idx_next = torch.gather(index, dim=-1, index=sample)
             
             # append sampled index to the running sequence and continue
             idx = torch.cat((idx, idx_next), dim=1)
